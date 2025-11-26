@@ -1,16 +1,30 @@
-use std::{io::Read as _, process::exit};
+use std::{
+    fs::File,
+    io::{Read as _, Write},
+    path::PathBuf,
+    process::exit,
+};
 
 use sevenz_rust2::ArchiveReader;
 
+use clap::Parser;
+
+#[derive(Debug, Parser)]
+struct Args {
+    video: PathBuf,
+}
+
 fn main() -> testresult::TestResult {
-    let mut ctx = md5::Context::new();
-    let mut file = std::io::stdin();
-    for _chunk in 0..10 {
-        let mut data = [0; 1048576];
-        file.read(&mut data[..])?;
-        ctx.consume(data);
-    }
-    let hex_digest = hex::encode(*ctx.finalize());
+    let args = Args::parse();
+    let mut video = File::open(&args.video)?;
+    let mut subtitles = args.video;
+    subtitles.set_extension("txt");
+    let mut subtitles = File::create_new(subtitles)?;
+    let mut buf = vec![0; 10485760];
+    video.read_exact(&mut buf)?;
+    let digest = md5::compute(&buf);
+
+    let hex_digest = hex::encode(*digest);
     let t_checksum = calc_checksum(&hex_digest);
     let url = format!(
         "https://napiprojekt.pl/unit_napisy/dl.php?l=PL&f={hex_digest}&t={t_checksum}&v=other&kolejka=false&nick=&pass=&napios=posix"
@@ -32,7 +46,7 @@ fn main() -> testresult::TestResult {
         let mut buf = vec![];
         std::io::copy(reader, &mut std::io::Cursor::new(&mut buf)).unwrap();
         let dec = encoding_rs::WINDOWS_1250.decode(&buf).0;
-        println!("{dec}");
+        subtitles.write_all(dec.as_bytes()).unwrap();
         Ok(true)
     })?;
 
