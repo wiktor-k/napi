@@ -1,4 +1,5 @@
 use std::{
+    fmt::LowerHex,
     fs::File,
     io::{Read as _, Write},
     path::PathBuf,
@@ -25,9 +26,9 @@ fn main() -> testresult::TestResult {
     let digest = md5::compute(&buf);
 
     let hex_digest = hex::encode(*digest);
-    let t_checksum = calc_checksum(&hex_digest);
+    let t_checksum = Checksum(&*digest);
     let url = format!(
-        "https://napiprojekt.pl/unit_napisy/dl.php?l=PL&f={hex_digest}&t={t_checksum}&v=other&kolejka=false&nick=&pass=&napios=posix"
+        "https://napiprojekt.pl/unit_napisy/dl.php?l=PL&f={hex_digest}&t={t_checksum:x}&v=other&kolejka=false&nick=&pass=&napios=posix"
     );
     eprintln!("url {url}");
     let mut resp = reqwest::blocking::get(url)?;
@@ -53,45 +54,39 @@ fn main() -> testresult::TestResult {
     Ok(())
 }
 
-fn calc_checksum(sum: &str) -> String {
-    use std::fmt::Write;
+struct Checksum<'a>(&'a [u8]);
 
-    let idx = [14, 3, 6, 8, 2];
-    let mul = [2, 2, 5, 4, 3];
-    let add = [0, 13, 16, 11, 5];
+static TRIPLES: [(u8, u16, usize); 5] = [(0, 2, 14), (13, 2, 3), (16, 5, 6), (11, 4, 8), (5, 3, 2)];
 
-    let mut out = String::new();
+impl LowerHex for Checksum<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let nibbles = self
+            .0
+            .iter()
+            .flat_map(|b| [b / 16, b % 16])
+            .collect::<Vec<_>>();
 
-    for p in 0..5 {
-        let n = add[p];
-        let a = mul[p];
-        let p = idx[p];
-        //eprintln!("n {n} a {a} p {p}");
-        let i = sum.chars().nth(p).unwrap().to_digit(16).unwrap();
-        let i = (n + i) as usize;
-        let s = sum.chars().nth(i).unwrap().to_digit(16).unwrap() * 16
-            + sum.chars().nth(i + 1).unwrap().to_digit(16).unwrap();
-        let y = s * a;
-        //eprintln!("i {i} s {s} y {y}");
-        let y = format!("{y:x}");
-        write!(out, "{}", y.chars().last().unwrap()).unwrap();
-        //eprintln!("napisum {out}");
+        for (add_i, mul_i, idx_i) in TRIPLES {
+            let i = (add_i + nibbles[idx_i]) as usize;
+            let s = u16::from_be_bytes([nibbles[i], nibbles[i + 1]]);
+            write!(f, "{:x}", (s * mul_i) % 16)?;
+        }
+
+        Ok(())
     }
-
-    out
 }
 
 #[cfg(test)]
 mod tests {
     use testresult::TestResult;
 
-    use crate::calc_checksum;
+    use super::*;
 
     #[test]
     fn checksum() -> TestResult {
         let sum = "4b3d32b7700b3588531dd81db058eba9";
-        let res = calc_checksum(&sum);
-        assert_eq!(res, "00640");
+        let res = Checksum(&hex::decode(sum)?);
+        assert_eq!(format!("{res:x}"), "00640");
 
         Ok(())
     }
