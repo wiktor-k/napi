@@ -19,7 +19,7 @@ fn main() -> testresult::TestResult {
     let args = Args::parse();
     let mut video = File::open(&args.video)?;
     let mut subtitles = args.video;
-    subtitles.set_extension("txt");
+    subtitles.set_extension("srt");
     let mut subtitles = File::create_new(subtitles)?;
     let mut buf = vec![0; 10485760];
     video.read_exact(&mut buf)?;
