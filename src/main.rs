@@ -45,7 +45,7 @@ fn main() -> testresult::TestResult {
     let mut seven = ArchiveReader::new(src_reader, password)?;
     seven.for_each_entries(|_entry, reader| {
         let mut buf = vec![];
-        std::io::copy(reader, &mut std::io::Cursor::new(&mut buf)).unwrap();
+        reader.read_to_end(&mut buf).unwrap();
         let dec = encoding_rs::WINDOWS_1250.decode(&buf).0;
         subtitles.write_all(dec.as_bytes()).unwrap();
         Ok(true)
