@@ -31,16 +31,13 @@ fn main() -> testresult::TestResult {
         "https://napiprojekt.pl/unit_napisy/dl.php?l=PL&f={hex_digest}&t={t_checksum:x}&v=other&kolejka=false&nick=&pass=&napios=posix"
     );
     eprintln!("url {url}");
-    let mut resp = reqwest::blocking::get(url)?;
+    let resp = reqwest::blocking::get(url)?;
     if !resp.status().is_success() {
         eprintln!("bad: {resp:?}");
         exit(1);
     }
 
-    let mut mem = vec![];
-    std::io::copy(&mut resp, &mut mem)?;
-
-    let src_reader = std::io::BufReader::new(std::io::Cursor::new(mem));
+    let src_reader = std::io::BufReader::new(std::io::Cursor::new(resp.bytes()?));
     let password = "iBlm8NTigvru0Jr0".into();
     let mut seven = ArchiveReader::new(src_reader, password)?;
     seven.for_each_entries(|_entry, reader| {
